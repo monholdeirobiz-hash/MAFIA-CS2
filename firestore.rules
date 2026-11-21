@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function admin() {
+      return signedIn() &&
+        request.auth.token.email in [
+          'monholdeirobiz@gmail.com',
+          'tsenguunnnee@gmail.com'
+        ];
+    }
+    match /teams/{id} {
+      allow read: if true;
+      allow create, update, delete: if admin();
+    }
+    match /players/{id} {
+      allow read: if true;
+      allow create: if admin() || (signedIn() && request.resource.data.uid == request.auth.uid);
+      allow update: if admin() ||
+        (signedIn() && resource.data.uid == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['displayName','country','steamUrl','photoURL','updatedAt']));
+      allow delete: if admin();
+    }
+    match /news/{id} {
+      allow read: if true;
+      allow create, update, delete: if admin();
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if signedIn() &&
+          request.resource.data.uid == request.auth.uid &&
+          request.resource.data.text is string &&
+          request.resource.data.text.size() > 0 &&
+          request.resource.data.text.size() <= 1000;
+        allow update, delete: if admin() ||
+          (signedIn() && resource.data.uid == request.auth.uid);
+      }
+    }
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if admin();
+    }
+  }
+}
